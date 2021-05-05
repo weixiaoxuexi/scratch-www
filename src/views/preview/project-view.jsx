@@ -8,7 +8,9 @@ const PropTypes = require('prop-types');
 const connect = require('react-redux').connect;
 const injectIntl = require('react-intl').injectIntl;
 const parser = require('scratch-parser');
+const queryString = require('query-string');
 
+const api = require('../../lib/api');
 const Page = require('../../components/page/www/page.jsx');
 const storage = require('../../lib/storage.js').default;
 const log = require('../../lib/log');
@@ -18,6 +20,7 @@ const ProjectInfo = require('../../lib/project-info');
 const PreviewPresentation = require('./presentation.jsx');
 const projectShape = require('./projectshape.jsx').projectShape;
 const Registration = require('../../components/registration/registration.jsx');
+const Scratch3Registration = require('../../components/registration/scratch3-registration.jsx');
 const ConnectedLogin = require('../../components/login/connected-login.jsx');
 const CanceledDeletionModal = require('../../components/login/canceled-deletion-modal.jsx');
 const NotAvailable = require('../../components/not-available/not-available.jsx');
@@ -26,6 +29,7 @@ const Meta = require('./meta.jsx');
 const sessionActions = require('../../redux/session.js');
 const navigationActions = require('../../redux/navigation.js');
 const previewActions = require('../../redux/preview.js');
+const projectCommentActions = require('../../redux/project-comment-actions.js');
 
 const frameless = require('../../lib/frameless');
 
@@ -34,17 +38,9 @@ const IntlGUI = injectIntl(GUI.default);
 
 const localStorageAvailable = 'localStorage' in window && window.localStorage !== null;
 
-const Sentry = require('@sentry/browser');
-if (`${process.env.SENTRY_DSN}` !== '') {
-    Sentry.init({
-        dsn: `${process.env.SENTRY_DSN}`,
-        // Do not collect global onerror, only collect specifically from React error boundaries.
-        // TryCatch plugin also includes errors from setTimeouts (i.e. the VM)
-        integrations: integrations => integrations.filter(i =>
-            !(i.name === 'GlobalHandlers' || i.name === 'TryCatch'))
-    });
-    window.Sentry = Sentry; // Allow GUI access to Sentry via window
-}
+const initSentry = require('../../lib/sentry.js');
+const xhr = require('xhr');
+initSentry();
 
 class Preview extends React.Component {
     constructor (props) {
@@ -81,6 +77,7 @@ class Preview extends React.Component {
             'handleSeeInside',
             'handleSetProjectThumbnailer',
             'handleShare',
+            'handleUpdateProjectData',
             'handleUpdateProjectId',
             'handleUpdateProjectTitle',
             'handleToggleComments',
@@ -227,6 +224,84 @@ class Preview extends React.Component {
             this.props.getRemixes(this.state.projectId);
         }
     }
+
+    // This is copy of what is in save-project-to-server in GUI that adds
+    // an extra get of the project info from api.  We  do this to wait for replication
+    // lag to pass.  This is intended to be a temporary fix until we use the data
+    // from the create request to fill the projectInfo state.
+    handleUpdateProjectData (projectId, vmState, params) {
+        const opts = {
+            body: vmState,
+            // If we set json:true then the body is double-stringified, so don't
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            withCredentials: true
+        };
+        const creatingProject = projectId === null || typeof projectId === 'undefined';
+        const queryParams = {};
+        if (params.hasOwnProperty('originalId')) queryParams.original_id = params.originalId;
+        if (params.hasOwnProperty('isCopy')) queryParams.is_copy = params.isCopy;
+        if (params.hasOwnProperty('isRemix')) queryParams.is_remix = params.isRemix;
+        if (params.hasOwnProperty('title')) queryParams.title = params.title;
+        let qs = queryString.stringify(queryParams);
+        if (qs) qs = `?${qs}`;
+        if (creatingProject) {
+            Object.assign(opts, {
+                method: 'post',
+                url: `${this.props.projectHost}/${qs}`
+            });
+        } else {
+            Object.assign(opts, {
+                method: 'put',
+                url: `${this.props.projectHost}/${projectId}${qs}`
+            });
+        }
+        return new Promise((resolve, reject) => {
+            xhr(opts, (err, response) => {
+                if (err) return reject(err);
+                if (response.statusCode !== 200) return reject(response.statusCode);
+                let body;
+                try {
+                    // Since we didn't set json: true, we have to parse manually
+                    body = JSON.parse(response.body);
+                } catch (e) {
+                    return reject(e);
+                }
+                body.id = projectId;
+                if (creatingProject) {
+                    body.id = body['content-name'];
+                }
+                resolve(body);
+            });
+        }).then(body => {
+            const fetchProjectInfo = (count, resolve) => {
+                api({
+                    uri: `/projects/${body.id}`,
+                    authentication: this.props.user.token
+                }, (err, projectInfo, response) => {
+                    if (err) {
+                        log.error(`Could not fetch project after creating: ${err}`);
+                        return resolve(body);
+                    }
+                    if (typeof body === 'undefined' || response.statusCode === 404) {
+                        // Retry after 500ms, 1.5s, 3.5s, 7.5s and then stop.
+                        if (count > 4) {
+                            return resolve(body);
+                        }
+                        return setTimeout(
+                            fetchProjectInfo.bind(this, count + 1, resolve),
+                            500 * Math.pow(2, count));
+                    }
+                    return resolve(body);
+                });
+            };
+            if (creatingProject) {
+                return new Promise((resolve, reject) => fetchProjectInfo(1, resolve, reject));
+            }
+            return body;
+        });
+    }
     setScreenFromOrientation () {
         /*
         * If the user is on a mobile device, switching to
@@ -257,7 +332,7 @@ class Preview extends React.Component {
                     // this is a project.json as an object
                     // validate expects a string or buffer as input
                     // TODO not sure if we need to check that it also isn't a data view
-                    input = JSON.stringify(input);
+                    input = JSON.stringify(input); // NOTE: what is the point of doing this??
                 }
                 parser(projectAsset.data, false, (err, projectData) => {
                     if (err) {
@@ -552,7 +627,11 @@ class Preview extends React.Component {
         );
     }
     handleSetLanguage (locale) {
-        jar.set('scratchlanguage', locale);
+        let opts = {};
+        if (window.location.hostname !== 'localhost') {
+            opts = {domain: `.${window.location.hostname}`};
+        }
+        jar.set('scratchlanguage', locale, opts);
     }
     handleUpdateProjectId (projectId, callback) {
         this.setState({projectId: projectId}, () => {
@@ -622,7 +701,10 @@ class Preview extends React.Component {
 
         return (
             <React.Fragment>
-                <Meta projectInfo={this.props.projectInfo} />
+                <Meta
+                    projectInfo={this.props.projectInfo}
+                    userPresent={this.props.userPresent}
+                />
                 {this.props.playerMode ?
                     <Page
                         className={classNames({
@@ -710,6 +792,7 @@ class Preview extends React.Component {
                             onSocialClosed={this.handleSocialClose}
                             onToggleComments={this.handleToggleComments}
                             onToggleStudio={this.handleToggleStudio}
+                            onUpdateProjectData={this.handleUpdateProjectData}
                             onUpdateProjectId={this.handleUpdateProjectId}
                             onUpdateProjectThumbnail={this.props.handleUpdateProjectThumbnail}
                         />
@@ -747,11 +830,20 @@ class Preview extends React.Component {
                             onSetLanguage={this.handleSetLanguage}
                             onShare={this.handleShare}
                             onToggleLoginOpen={this.props.handleToggleLoginOpen}
+                            onUpdateProjectData={this.handleUpdateProjectData}
                             onUpdateProjectId={this.handleUpdateProjectId}
                             onUpdateProjectThumbnail={this.props.handleUpdateProjectThumbnail}
                             onUpdateProjectTitle={this.handleUpdateProjectTitle}
                         />
-                        <Registration />
+                        {this.props.registrationOpen && (
+                            this.props.useScratch3Registration ? (
+                                <Scratch3Registration
+                                    isOpen
+                                />
+                            ) : (
+                                <Registration />
+                            )
+                        )}
                         <CanceledDeletionModal />
                     </React.Fragment>
                 }
@@ -822,6 +914,7 @@ Preview.propTypes = {
     projectInfo: projectShape,
     projectNotAvailable: PropTypes.bool,
     projectStudios: PropTypes.arrayOf(PropTypes.object),
+    registrationOpen: PropTypes.bool,
     remixProject: PropTypes.func,
     remixes: PropTypes.arrayOf(PropTypes.object),
     replies: PropTypes.objectOf(PropTypes.array),
@@ -835,6 +928,7 @@ Preview.propTypes = {
     shareProject: PropTypes.func.isRequired,
     toggleStudio: PropTypes.func.isRequired,
     updateProject: PropTypes.func.isRequired,
+    useScratch3Registration: PropTypes.bool,
     user: PropTypes.shape({
         id: PropTypes.number,
         banned: PropTypes.bool,
@@ -905,7 +999,7 @@ const mapStateToProps = state => {
         canShare: userOwnsProject && state.permissions.social,
         canToggleComments: userOwnsProject || isAdmin,
         canUseBackpack: isLoggedIn,
-        comments: state.preview.comments,
+        comments: state.comments.comments,
         enableCommunity: projectInfoPresent,
         faved: state.preview.faved,
         favedLoaded: state.preview.status.faved === previewActions.Status.FETCHED,
@@ -920,16 +1014,18 @@ const mapStateToProps = state => {
         isShared: isShared,
         loved: state.preview.loved,
         lovedLoaded: state.preview.status.loved === previewActions.Status.FETCHED,
-        moreCommentsToLoad: state.preview.moreCommentsToLoad,
+        moreCommentsToLoad: state.comments.moreCommentsToLoad,
         original: state.preview.original,
         parent: state.preview.parent,
         playerMode: state.scratchGui.mode.isPlayerOnly,
         projectInfo: state.preview.projectInfo,
         projectNotAvailable: state.preview.projectNotAvailable,
         projectStudios: state.preview.projectStudios,
+        registrationOpen: state.navigation.registrationOpen,
         remixes: state.preview.remixes,
-        replies: state.preview.replies,
+        replies: state.comments.replies,
         sessionStatus: state.session.status, // check if used
+        useScratch3Registration: state.navigation.useScratch3Registration,
         user: state.session.session.user,
         userOwnsProject: userOwnsProject,
         userPresent: userPresent,
@@ -939,16 +1035,16 @@ const mapStateToProps = state => {
 
 const mapDispatchToProps = dispatch => ({
     handleAddComment: (comment, topLevelCommentId) => {
-        dispatch(previewActions.addNewComment(comment, topLevelCommentId));
+        dispatch(projectCommentActions.addNewComment(comment, topLevelCommentId));
     },
     handleDeleteComment: (projectId, commentId, topLevelCommentId, token) => {
-        dispatch(previewActions.deleteComment(projectId, commentId, topLevelCommentId, token));
+        dispatch(projectCommentActions.deleteComment(projectId, commentId, topLevelCommentId, token));
     },
     handleReportComment: (projectId, commentId, topLevelCommentId, token) => {
-        dispatch(previewActions.reportComment(projectId, commentId, topLevelCommentId, token));
+        dispatch(projectCommentActions.reportComment(projectId, commentId, topLevelCommentId, token));
     },
     handleRestoreComment: (projectId, commentId, topLevelCommentId, token) => {
-        dispatch(previewActions.restoreComment(projectId, commentId, topLevelCommentId, token));
+        dispatch(projectCommentActions.restoreComment(projectId, commentId, topLevelCommentId, token));
     },
     handleOpenRegistration: event => {
         event.preventDefault();
@@ -966,8 +1062,8 @@ const mapDispatchToProps = dispatch => ({
         dispatch(navigationActions.toggleLoginOpen());
     },
     handleSeeAllComments: (id, ownerUsername, isAdmin, token) => {
-        dispatch(previewActions.resetComments());
-        dispatch(previewActions.getTopLevelComments(id, 0, ownerUsername, isAdmin, token));
+        dispatch(projectCommentActions.resetComments());
+        dispatch(projectCommentActions.getTopLevelComments(id, 0, ownerUsername, isAdmin, token));
     },
     handleUpdateProjectThumbnail: (id, blob) => {
         dispatch(previewActions.updateProjectThumbnail(id, blob));
@@ -998,13 +1094,13 @@ const mapDispatchToProps = dispatch => ({
         }
     },
     getTopLevelComments: (id, offset, ownerUsername, isAdmin, token) => {
-        dispatch(previewActions.getTopLevelComments(id, offset, ownerUsername, isAdmin, token));
+        dispatch(projectCommentActions.getTopLevelComments(id, offset, ownerUsername, isAdmin, token));
     },
     getCommentById: (projectId, commentId, ownerUsername, isAdmin, token) => {
-        dispatch(previewActions.getCommentById(projectId, commentId, ownerUsername, isAdmin, token));
+        dispatch(projectCommentActions.getCommentById(projectId, commentId, ownerUsername, isAdmin, token));
     },
     getMoreReplies: (projectId, commentId, offset, ownerUsername, isAdmin, token) => {
-        dispatch(previewActions.getReplies(projectId, [commentId], offset, ownerUsername, isAdmin, token));
+        dispatch(projectCommentActions.getReplies(projectId, [commentId], offset, ownerUsername, isAdmin, token));
     },
     getFavedStatus: (id, username, token) => {
         dispatch(previewActions.getFavedStatus(id, username, token));
@@ -1041,7 +1137,7 @@ const mapDispatchToProps = dispatch => ({
     },
     remixProject: () => {
         dispatch(GUI.remixProject());
-        dispatch(previewActions.resetComments());
+        dispatch(projectCommentActions.resetComments());
     },
     setPlayer: player => {
         dispatch(GUI.setPlayer(player));
@@ -1079,15 +1175,12 @@ module.exports.initGuiState = guiInitialState => {
     const parts = pathname.split('/').filter(Boolean);
     // parts[0]: 'projects'
     // parts[1]: either :id or 'editor'
-    // parts[2]: undefined if no :id, otherwise either 'editor', 'fullscreen' or 'embed'
+    // parts[2]: undefined if no :id, otherwise either 'editor' or 'fullscreen'
     if (parts.indexOf('editor') === -1) {
         guiInitialState = GUI.initPlayer(guiInitialState);
     }
     if (parts.indexOf('fullscreen') !== -1) {
         guiInitialState = GUI.initFullScreen(guiInitialState);
-    }
-    if (parts.indexOf('embed') !== -1) {
-        guiInitialState = GUI.initEmbedded(guiInitialState);
     }
     return guiInitialState;
 };

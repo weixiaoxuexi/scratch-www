@@ -4,11 +4,10 @@ const FormattedMessage = require('react-intl').FormattedMessage;
 const PropTypes = require('prop-types');
 const React = require('react');
 
-
 const FlexRow = require('../../components/flex-row/flex-row.jsx');
 const Button = require('../../components/forms/button.jsx');
 
-const OS_ENUM = require('../../components/extension-landing/os-enum.js');
+const OS_ENUM = require('../../lib/os-enum.js');
 
 require('./os-chooser.scss');
 
@@ -33,6 +32,24 @@ const OSChooser = props => (
             >
                 <img src="/svgs/extensions/mac.svg" />
             macOS
+            </Button>
+            <Button
+                className={classNames({active: props.currentOS === OS_ENUM.CHROMEOS})}
+                onClick={() => // eslint-disable-line react/jsx-no-bind
+                    props.handleSetOS(OS_ENUM.CHROMEOS)
+                }
+            >
+                <img src="/svgs/extensions/chromeos.svg" />
+            ChromeOS
+            </Button>
+            <Button
+                className={classNames({active: props.currentOS === OS_ENUM.ANDROID})}
+                onClick={() => // eslint-disable-line react/jsx-no-bind
+                    props.handleSetOS(OS_ENUM.ANDROID)
+                }
+            >
+                <img src="/svgs/extensions/android.svg" />
+            Android
             </Button>
         </FlexRow>
     </div>

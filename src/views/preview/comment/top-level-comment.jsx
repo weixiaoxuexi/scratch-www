@@ -74,6 +74,7 @@ class TopLevelComment extends React.Component {
         const {
             author,
             canDelete,
+            canDeleteWithoutConfirm,
             canReply,
             canReport,
             canRestore,
@@ -86,7 +87,7 @@ class TopLevelComment extends React.Component {
             onReport,
             onRestore,
             replies,
-            projectId,
+            postURI,
             visibility
         } = this.props;
 
@@ -96,13 +97,14 @@ class TopLevelComment extends React.Component {
             <FlexRow className="comment-container">
                 <Comment
                     highlighted={highlightedCommentId === id}
-                    projectId={projectId}
+                    postURI={postURI}
                     onAddComment={this.handleAddComment}
                     {...{
                         author,
                         content,
                         datetimeCreated,
                         canDelete,
+                        canDeleteWithoutConfirm,
                         canReply,
                         canReport,
                         canRestore,
@@ -126,6 +128,7 @@ class TopLevelComment extends React.Component {
                             <Comment
                                 author={reply.author}
                                 canDelete={canDelete}
+                                canDeleteWithoutConfirm={canDeleteWithoutConfirm}
                                 canReply={canReply}
                                 canReport={canReport}
                                 canRestore={canRestore && parentVisible}
@@ -135,7 +138,7 @@ class TopLevelComment extends React.Component {
                                 id={reply.id}
                                 key={reply.id}
                                 parentId={id}
-                                projectId={projectId}
+                                postURI={postURI}
                                 replyUsername={this.authorUsername(reply.commentee_id)}
                                 visibility={reply.visibility}
                                 onAddComment={this.handleAddComment}
@@ -168,6 +171,7 @@ TopLevelComment.propTypes = {
         username: PropTypes.string
     }),
     canDelete: PropTypes.bool,
+    canDeleteWithoutConfirm: PropTypes.bool,
     canReply: PropTypes.bool,
     canReport: PropTypes.bool,
     canRestore: PropTypes.bool,
@@ -184,12 +188,13 @@ TopLevelComment.propTypes = {
     onReport: PropTypes.func,
     onRestore: PropTypes.func,
     parentId: PropTypes.number,
-    projectId: PropTypes.string,
+    postURI: PropTypes.string,
     replies: PropTypes.arrayOf(PropTypes.object),
     visibility: PropTypes.string
 };
 
 TopLevelComment.defaultProps = {
+    canDeleteWithoutConfirm: false,
     defaultExpanded: false,
     moreRepliesToLoad: false
 };

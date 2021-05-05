@@ -17,6 +17,12 @@ class WelcomeStep extends React.Component {
             'validateForm'
         ]);
     }
+    componentDidMount () {
+        if (this.props.sendAnalytics) {
+            this.props.sendAnalytics('join-welcome');
+        }
+    }
+
     validateForm () {
         return {};
     }
@@ -27,8 +33,6 @@ class WelcomeStep extends React.Component {
     render () {
         return (
             <Formik
-                initialValues={{
-                }}
                 validate={this.validateForm}
                 validateOnBlur={false}
                 validateOnChange={false}
@@ -41,26 +45,33 @@ class WelcomeStep extends React.Component {
                     } = props;
                     return (
                         <JoinFlowStep
-                            description={this.props.intl.formatMessage({
-                                id: 'registration.welcomeStepDescriptionNonEducator'
-                            })}
-                            headerImgSrc="/images/hoc/getting-started.jpg"
-                            nextButton={
+                            headerImgClass="welcome-step-image"
+                            headerImgSrc="/images/join-flow/welcome-header.png"
+                            innerClassName="join-flow-inner-welcome-step"
+                            nextButton={this.props.createProjectOnComplete ? (
                                 <React.Fragment>
-                                    <FormattedMessage id="registration.makeProject" />
+                                    <FormattedMessage id="general.getStarted" />
                                     <img
                                         className="join-flow-next-button-arrow"
                                         src="/svgs/project/r-arrow.svg"
                                     />
                                 </React.Fragment>
-                            }
+                            ) : (
+                                <FormattedMessage id="general.done" />
+                            )}
                             title={`${this.props.intl.formatMessage(
                                 {id: 'registration.welcomeStepTitleNonEducator'},
                                 {username: this.props.username}
                             )}`}
+                            titleClassName="join-flow-welcome-title"
                             waiting={isSubmitting}
                             onSubmit={handleSubmit}
                         >
+                            <div className="join-flow-instructions">
+                                <FormattedMessage
+                                    id="registration.welcomeStepDescriptionNonEducator"
+                                />
+                            </div>
                             <div className="join-flow-instructions">
                                 <FormattedMessage
                                     id="registration.welcomeStepInstructions"
@@ -78,9 +89,11 @@ class WelcomeStep extends React.Component {
 }
 
 WelcomeStep.propTypes = {
+    createProjectOnComplete: PropTypes.bool,
     email: PropTypes.string,
     intl: intlShape,
     onNextStep: PropTypes.func,
+    sendAnalytics: PropTypes.func,
     username: PropTypes.string
 };
 

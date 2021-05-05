@@ -18,68 +18,71 @@ const LoginDropdown = require('../../login/login-dropdown.jsx');
 const CanceledDeletionModal = require('../../login/canceled-deletion-modal.jsx');
 const NavigationBox = require('../base/navigation.jsx');
 const Registration = require('../../registration/registration.jsx');
-const Scratch3Registration = require('../../registration/scratch3-registration.jsx');
 const AccountNav = require('./accountnav.jsx');
 
 require('./navigation.scss');
-
-const USE_SCRATCH3_REGISTRATION = false;
 
 class Navigation extends React.Component {
     constructor (props) {
         super(props);
         bindAll(this, [
             'getProfileUrl',
-            'handleSearchSubmit'
+            'handleSearchSubmit',
+            'pollForMessages'
         ]);
-        this.state = {
-            messageCountIntervalId: -1 // javascript method interval id for getting messsage count.
-        };
+        // Keep the timeout id so we can cancel it (e.g. when we unmount)
+        this.messageCountTimeoutId = -1;
     }
     componentDidMount () {
         if (this.props.user) {
-            const intervalId = setInterval(() => {
-                this.props.getMessageCount(this.props.user.username);
-            }, 120000); // check for new messages every 2 mins.
-            this.setState({ // eslint-disable-line react/no-did-mount-set-state
-                messageCountIntervalId: intervalId
-            });
+            // Setup polling for messages to start in 2 minutes.
+            const twoMinInMs = 2 * 60 * 1000;
+            this.messageCountTimeoutId = setTimeout(this.pollForMessages.bind(this, twoMinInMs), twoMinInMs);
         }
     }
     componentDidUpdate (prevProps) {
         if (prevProps.user !== this.props.user) {
-            this.props.closeAccountMenus();
+            this.props.handleCloseAccountNav();
             if (this.props.user) {
-                const intervalId = setInterval(() => {
-                    this.props.getMessageCount(this.props.user.username);
-                }, 120000); // check for new messages every 2 mins.
-                this.setState({ // eslint-disable-line react/no-did-update-set-state
-                    messageCountIntervalId: intervalId
-                });
+                const twoMinInMs = 2 * 60 * 1000;
+                this.messageCountTimeoutId = setTimeout(this.pollForMessages.bind(this, twoMinInMs), twoMinInMs);
             } else {
-                // clear message count check, and set to default id.
-                clearInterval(this.state.messageCountIntervalId);
+                // Clear message count check, and set to default id.
+                if (this.messageCountTimeoutId !== -1) {
+                    clearTimeout(this.messageCountTimeoutId);
+                }
                 this.props.setMessageCount(0);
-                this.setState({ // eslint-disable-line react/no-did-update-set-state
-                    messageCountIntervalId: -1
-                });
+                this.messageCountTimeoutId = -1;
             }
         }
     }
     componentWillUnmount () {
         // clear message interval if it exists
-        if (this.state.messageCountIntervalId !== -1) {
-            clearInterval(this.state.messageCountIntervalId);
+        if (this.messageCountTimeoutId !== -1) {
+            clearTimeout(this.messageCountTimeoutId);
             this.props.setMessageCount(0);
-            this.setState({
-                messageCountIntervalId: -1
-            });
+            this.messageCountTimeoutId = -1;
         }
     }
     getProfileUrl () {
         if (!this.props.user) return;
         return `/users/${this.props.user.username}/`;
     }
+
+    pollForMessages (ms) {
+        this.props.getMessageCount(this.props.user.username);
+        // We only poll if it has been less than 32 minutes.
+        // Chances of someone actively using the page for that long without
+        // a navigation is low.
+        if (ms < 32 * 60 * 1000) { // 32 minutes
+            const nextFetch = ms * 2; // exponentially back off next fetch time.
+            const timeoutId = setTimeout(() => {
+                this.pollForMessages(nextFetch);
+            }, nextFetch);
+            this.messageCountTimeoutId = timeoutId;
+        }
+    }
+
     handleSearchSubmit (formData) {
         let targetUrl = '/search/projects';
         if (formData.q) {
@@ -191,24 +194,16 @@ class Navigation extends React.Component {
                                 className="link right join"
                                 key="join"
                             >
+                                {/* there's no css class registrationLink -- this is
+                                just to make the link findable for testing */}
                                 <a
+                                    className="registrationLink"
                                     href="#"
-                                    onClick={this.props.handleOpenRegistration}
+                                    onClick={this.props.handleClickRegistration}
                                 >
                                     <FormattedMessage id="general.joinScratch" />
                                 </a>
                             </li>,
-                            (
-                                USE_SCRATCH3_REGISTRATION ? (
-                                    <Scratch3Registration
-                                        key="scratch3registration"
-                                    />
-                                ) : (
-                                    <Registration
-                                        key="registration"
-                                    />
-                                )
-                            ),
                             <li
                                 className="link right login-item"
                                 key="login"
@@ -225,7 +220,13 @@ class Navigation extends React.Component {
                                     key="login-dropdown"
                                 />
                             </li>
-                        ]) : []}
+                        ]) : []
+                    }
+                    {this.props.registrationOpen && !this.props.useScratch3Registration && (
+                        <Registration
+                            key="registration"
+                        />
+                    )}
                 </ul>
                 <CanceledDeletionModal />
             </NavigationBox>
@@ -235,11 +236,10 @@ class Navigation extends React.Component {
 
 Navigation.propTypes = {
     accountNavOpen: PropTypes.bool,
-    closeAccountMenus: PropTypes.func,
     getMessageCount: PropTypes.func,
+    handleClickRegistration: PropTypes.func,
     handleCloseAccountNav: PropTypes.func,
     handleLogOut: PropTypes.func,
-    handleOpenRegistration: PropTypes.func,
     handleToggleAccountNav: PropTypes.func,
     handleToggleLoginOpen: PropTypes.func,
     intl: intlShape,
@@ -250,12 +250,14 @@ Navigation.propTypes = {
         educator_invitee: PropTypes.bool,
         student: PropTypes.bool
     }),
+    registrationOpen: PropTypes.bool,
     searchTerm: PropTypes.string,
     session: PropTypes.shape({
         status: PropTypes.string
     }),
     setMessageCount: PropTypes.func,
     unreadMessageCount: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+    useScratch3Registration: PropTypes.bool,
     user: PropTypes.shape({
         classroomId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
         thumbnailUrl: PropTypes.string,
@@ -273,15 +275,14 @@ const mapStateToProps = state => ({
     accountNavOpen: state.navigation && state.navigation.accountNavOpen,
     session: state.session,
     permissions: state.permissions,
+    registrationOpen: state.navigation.registrationOpen,
     searchTerm: state.navigation.searchTerm,
     unreadMessageCount: state.messageCount.messageCount,
-    user: state.session && state.session.session && state.session.session.user
+    user: state.session && state.session.session && state.session.session.user,
+    useScratch3Registration: state.navigation.useScratch3Registration
 });
 
 const mapDispatchToProps = dispatch => ({
-    closeAccountMenus: () => {
-        dispatch(navigationActions.closeAccountMenus());
-    },
     getMessageCount: username => {
         dispatch(messageCountActions.getCount(username));
     },
@@ -292,9 +293,9 @@ const mapDispatchToProps = dispatch => ({
     handleCloseAccountNav: () => {
         dispatch(navigationActions.setAccountNavOpen(false));
     },
-    handleOpenRegistration: event => {
+    handleClickRegistration: event => {
         event.preventDefault();
-        dispatch(navigationActions.setRegistrationOpen(true));
+        dispatch(navigationActions.handleRegistrationRequested());
     },
     handleLogOut: event => {
         event.preventDefault();
@@ -309,9 +310,15 @@ const mapDispatchToProps = dispatch => ({
     }
 });
 
+// Allow incoming props to override redux-provided props. Used to mock in tests.
+const mergeProps = (stateProps, dispatchProps, ownProps) => Object.assign(
+    {}, stateProps, dispatchProps, ownProps
+);
+
 const ConnectedNavigation = connect(
     mapStateToProps,
-    mapDispatchToProps
+    mapDispatchToProps,
+    mergeProps
 )(Navigation);
 
 module.exports = injectIntl(ConnectedNavigation);

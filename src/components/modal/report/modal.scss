@@ -10,18 +10,13 @@
 .report-modal-content {
     margin: 1rem auto;
     width: 80%;
+    font-size: .875rem;
+
 
     .instructions {
         line-height: 1.5rem;
-    }
 
-    .received {
-        margin: 0 auto;
-        width: 90%;
-        text-align: center;
-        line-height: 1.65rem;
-
-        .received-header {
+        .instructions-header {
             font-weight: bold;
         }
     }
@@ -75,6 +70,10 @@
                 display: none;
             }
         }
+    }
+
+    ul, p {
+        font-size: .875rem;
     }
 }
 

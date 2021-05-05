@@ -7,6 +7,14 @@
         "title": "About"
     },
     {
+        "name": "annual-report",
+        "pattern": "^/annual-report/?(\\?.*)?$",
+        "routeAlias": "/annual-report/?$",
+        "view": "annual-report/annual-report",
+        "title": "Annual Report",
+        "viewportWidth": "device-width"
+    },
+    {
         "name": "camp",
         "pattern": "^/camp/?$",
         "routeAlias": "/camp/?$",
@@ -14,17 +22,10 @@
         "title": "Down Deep"
     },
     {
-        "name": "communityblocks-interviews",
-        "pattern": "^/info/communityblocks-interviews/?$",
-        "routeAlias": "/info/(cards|communityblocks-interviews|credits|faq|donate)/?$",
-        "view": "communityblocks-interviews/communityblocks-interviews",
-        "title": "Community Blocks Beta Tester Interviews"
-    },
-    {
         "name": "conference-index",
         "pattern": "^/conference/?(\\?.*)?$",
         "routeAlias": "/conference(?!/201[4-9])",
-        "redirect": "/conference/2019"
+        "redirect": "/conference/2020"
     },
     {
         "name": "conference-index-2017",
@@ -79,15 +80,31 @@
         "viewportWidth": "device-width"
     },
     {
+        "name": "conference-index-2020",
+        "pattern": "^/conference/2020/?$",
+        "routeAlias": "/conference(?!/201[4-9])",
+        "view": "conference/2020/index/index",
+        "title": "Scratch Conferences",
+        "viewportWidth": "device-width"
+    },
+    {
         "name": "connect",
         "pattern": "^/connect/?$",
         "routeAlias": "/connect/?$",
         "redirect": "https://eepurl.com/cws7_f"
     },
     {
+        "name": "contact-us",
+        "pattern": "^/contact-us/?(\\?.*)?$",
+        "routeAlias": "/contact-us/?",
+        "view": "contact-us/contact-us",
+        "title": "Contact Us",
+        "viewportWidth": "device-width"
+    },
+    {
         "name": "credits",
         "pattern": "^/credits/?$",
-        "routeAlias": "/info/(cards|communityblocks-interviews|credits|faq|donate)/?$",
+        "routeAlias": "/info/(cards|credits|faq|donate)/?$",
         "view": "credits/credits",
         "title": "Credits"
     },
@@ -129,7 +146,7 @@
     {
         "name": "faq",
         "pattern": "^/info/faq/?(\\?.*)?$",
-        "routeAlias": "/info/(cards|communityblocks-interviews|credits|faq)/?$",
+        "routeAlias": "/info/(cards|credits|faq)/?$",
         "view": "faq/faq",
         "title": "FAQ"
     },
@@ -148,18 +165,16 @@
         "title": "Ideas"
     },
     {
-        "name": "jobs",
-        "pattern": "^/jobs/?$",
-        "routeAlias": "/jobs(/moderator)?/?$",
-        "view": "jobs/jobs",
-        "title": "Jobs"
+        "name": "jobs-redirect",
+        "pattern": "^/jobs/?(\\?.*)?$",
+        "redirect": "https://www.scratchfoundation.org/opportunities/"
     },
     {
-        "name": "jobs-moderator",
-        "pattern": "^/jobs/moderator/?$",
-        "routeAlias": "/jobs(/moderator)?/?$",
-        "view": "jobs/moderator/moderator",
-        "title": "Community Moderator"
+        "name": "join",
+        "pattern": "^/join/?$",
+        "routeAlias": "/join/?$",
+        "view": "join/join",
+        "title": "Join Scratch"
     },
     {
         "name": "messages",
@@ -170,9 +185,17 @@
     },
     {
         "name": "projects",
-        "pattern": "^/projects(/editor|(/\\d+(/editor|/fullscreen|/embed)?)?)?/?(\\?.*)?$",
+        "pattern": "^/projects(/editor|(/\\d+(/editor|/fullscreen)?)?)?/?(\\?.*)?$",
         "routeAlias": "/projects/?$",
         "view": "preview/preview",
+        "title": "Scratch Project",
+        "dynamicMetaTags": true
+    },
+    {
+        "name": "embed",
+        "pattern": "^/projects/\\d+/embed/?(\\?.*)?$",
+        "routeAlias": "/projects/?$",
+        "view": "preview/embed",
         "title": "Scratch Project",
         "dynamicMetaTags": true
     },
@@ -225,6 +248,14 @@
         "title": "Search"
     },
     {
+        "name": "sec",
+        "pattern": "^/sec/?(\\?.*)?$",
+        "routeAlias": "/sec/?",
+        "view": "sec/sec",
+        "title": "Scratch Education Collaborative",
+        "viewportWidth": "device-width"
+    },
+    {
         "name": "splash",
         "pattern": "^/?$",
         "routeAlias": "/?$",
@@ -259,6 +290,20 @@
         "title": "Class Registration"
     },
     {
+        "name": "student-registration-token-only",
+        "pattern": "^/signup/:token",
+        "routeAlias": "/signup/.+",
+        "view": "studentregistration/studentregistration",
+        "title": "Class Registration"
+    },
+    {
+        "name": "studio",
+        "pattern": "^/studios-playground/\\d+(/projects|/curators|/activity|/comments)?/?(\\?.*)?$",
+        "routeAlias": "/studios-playground/?$",
+        "view": "studio/studio",
+        "title": "Studio Playground"
+    },
+    {
         "name": "teacher-faq",
         "pattern": "^/educators/faq/?$",
         "routeAlias": "/educators(?:/(faq|register|waiting))?/?$",
@@ -288,7 +333,7 @@
     },
     {
         "name": "wedo2",
-        "pattern": "^/wedo/?$",
+        "pattern": "^/wedo/?(\\?.*)?$",
         "routeAlias": "/wedo/?$",
         "view": "wedo2/wedo2",
         "title": "WeDo 2.0"
@@ -302,28 +347,28 @@
     },
     {
         "name": "ev3",
-        "pattern": "^/ev3/?$",
+        "pattern": "^/ev3/?(\\?.*)?$",
         "routeAlias": "/ev3/?$",
         "view": "ev3/ev3",
         "title": "LEGO MINDSTORMS EV3"
     },
     {
         "name": "microbit",
-        "pattern": "^/microbit/?$",
+        "pattern": "^/microbit/?(\\?.*)?$",
         "routeAlias": "/microbit/?$",
         "view": "microbit/microbit",
         "title": "micro:bit"
     },
     {
         "name": "vernier",
-        "pattern": "^/vernier/?$",
+        "pattern": "^/vernier/?(\\?.*)?$",
         "routeAlias": "/vernier/?$",
         "view": "gdxfor/gdxfor",
         "title": "Vernier Go Direct Force and Acceleration"
     },
     {
         "name": "boost",
-        "pattern": "^/boost/?$",
+        "pattern": "^/boost/?(\\?.*)?$",
         "routeAlias": "/boost/?$",
         "view": "boost/boost",
         "title": "LEGO BOOST"
@@ -337,13 +382,13 @@
     {
         "name" : "credits-redirect",
         "pattern": "^/info/credits/?$",
-        "routeAlias": "/info/(cards|communityblocks-interviews|credits|faq|donate)/?$",
+        "routeAlias": "/info/(cards|credits|faq|donate)/?$",
         "redirect" : "/credits"
     },
     {
         "name": "donate-redirect",
         "pattern": "^/info/donate/?",
-        "routeAlias": "/info/(cards|communityblocks-interviews|credits|faq|donate)/?$",
+        "routeAlias": "/info/(cards|credits|faq|donate)/?$",
         "redirect": "https://secure.donationpay.org/scratchfoundation/"
     },
     {
@@ -404,6 +449,12 @@
         "pattern": "^/info/?(\\?.*)?$",
         "routeAlias": "/info/?(\\?.*)?$",
         "redirect": "/ideas"
+    },
+    {
+        "name": "register-redirect",
+        "pattern": "^/accounts/standalone-registration/?$",
+        "routeAlias": "/accounts/standalone-registration/",
+        "redirect": "/join"
     },
     {
         "name": "research-redirect",
@@ -471,6 +522,16 @@
         "redirect": "/projects/editor/?tutorial=pong"
     },
     {
+        "name": "animateacharacter-tutorial-redirect",
+        "pattern": "^/animate-a-character/?$",
+        "redirect": "/projects/editor/?tutorial=animate-a-character"
+    },
+    {
+        "name": "videosensing-tutorial-redirect",
+        "pattern": "^/video-sensing/?$",
+        "redirect": "/projects/editor/?tutorial=video-sensing"
+    },
+    {
         "name": "clicker-tutorial-redirect",
         "pattern": "^/clicker/?$",
         "redirect": "/projects/editor/?tutorial=clicker-game"
@@ -499,13 +560,18 @@
         "name": "fly-tutorial-redirect",
         "pattern": "^/fly/?$",
         "routeAlias": "/(makeit)?fly/?$",
-        "redirect": "/ideas"
+        "redirect": "/projects/editor/?tutorial=make-it-fly"
     },
     {
         "name": "makeitfly-tutorial-redirect",
         "pattern": "^/makeitfly/?$",
         "routeAlias": "/(makeit)?fly/?$",
-        "redirect": "/ideas"
+        "redirect": "/projects/editor/?tutorial=make-it-fly"
+    },
+    {
+        "name": "imagine-if-tutorial-redirect",
+        "pattern": "^/imagine/?(\\?.*)?$",
+        "redirect": "/projects/editor/?tutorial=imagine"
     },
     {
         "name": "pet-tutorial-redirect",
@@ -546,6 +612,16 @@
         "name": "bearstack-tutorial-redirect",
         "pattern": "^/bearstack/?$",
         "redirect": "/ideas"
+    },
+    {
+        "name": "talking-tales-tutorial-redirect",
+        "pattern": "^/talking-tales/?(\\?.*)?$",
+        "redirect": "/projects/editor?tutorial=talking"
+    },
+    {
+        "name": "code-a-cartoon-tutorial-redirect",
+        "pattern": "^/code-a-cartoon/?(\\?.*)?$",
+        "redirect": "/projects/331474033/editor/?tutorial=code-cartoon"
     },
     {
         "name": "favorite-tutorial-redirect",

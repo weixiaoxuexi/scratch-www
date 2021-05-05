@@ -10,56 +10,92 @@ require('./join-flow-step.scss');
 
 const JoinFlowStep = ({
     children,
-    className,
+    innerClassName,
     description,
+    descriptionClassName,
+    footerContent,
+    headerImgClass,
     headerImgSrc,
     nextButton,
     onSubmit,
     title,
+    titleClassName,
     waiting
 }) => (
-    <form onSubmit={onSubmit}>
-        {headerImgSrc && (
-            <div className="join-flow-header-image">
-                <img src={headerImgSrc} />
-            </div>
-        )}
-        <div>
-            <ModalInnerContent
-                className={classNames(
-                    'join-flow-inner-content',
-                    className
-                )}
-            >
-                {title && (
-                    <ModalTitle
-                        className="join-flow-title"
-                        title={title}
+    <form
+        autoComplete="off"
+        onSubmit={onSubmit}
+    >
+        <div className="join-flow-outer-content">
+            {headerImgSrc && (
+                <div
+                    className={classNames(
+                        'join-flow-header-image-wrapper',
+                        headerImgClass
+                    )}
+                >
+                    <img
+                        className="join-flow-header-image"
+                        src={headerImgSrc}
                     />
-                )}
-                {description && (
-                    <div className="join-flow-description">
-                        {description}
+                </div>
+            )}
+            <div>
+                <ModalInnerContent
+                    className={classNames(
+                        'join-flow-inner-content',
+                        innerClassName
+                    )}
+                >
+                    {title && (
+                        <ModalTitle
+                            className={classNames(
+                                'join-flow-title',
+                                titleClassName
+                            )}
+                            title={title}
+                        />
+                    )}
+                    {description && (
+                        <div
+                            className={classNames(
+                                'join-flow-description',
+                                descriptionClassName
+                            )}
+                        >
+                            {description}
+                        </div>
+                    )}
+                    {children}
+                </ModalInnerContent>
+            </div>
+            <div>
+                {footerContent && (
+                    <div className="join-flow-footer-message">
+                        {footerContent}
                     </div>
                 )}
-                {children}
-            </ModalInnerContent>
+                <NextStepButton
+                    content={nextButton}
+                    waiting={waiting}
+                />
+            </div>
         </div>
-        <NextStepButton
-            content={nextButton}
-            waiting={waiting}
-        />
     </form>
 );
 
 JoinFlowStep.propTypes = {
     children: PropTypes.node,
-    className: PropTypes.string,
     description: PropTypes.string,
+    descriptionClassName: PropTypes.string,
+    footerContent: PropTypes.oneOfType([PropTypes.string, PropTypes.node]),
+    headerImgClass: PropTypes.string,
     headerImgSrc: PropTypes.string,
+    innerClassName: PropTypes.string,
     nextButton: PropTypes.node,
     onSubmit: PropTypes.func,
     title: PropTypes.string,
+    titleClassName: PropTypes.string,
     waiting: PropTypes.bool
 };
 

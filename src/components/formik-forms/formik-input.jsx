@@ -5,12 +5,14 @@ import {Field} from 'formik';
 
 const ValidationMessage = require('../forms/validation-message.jsx');
 
-require('../forms/input.scss');
 require('../forms/row.scss');
+require('./formik-input.scss');
 
 const FormikInput = ({
     className,
     error,
+    onSetRef,
+    toolTip,
     validationClassName,
     wrapperClassName,
     ...props
@@ -25,24 +27,36 @@ const FormikInput = ({
     >
         <Field
             className={classNames(
-                'input',
+                'formik-input',
+                {fail: error},
                 className
             )}
+            /* formik uses "innerRef" to return the actual input element */
+            innerRef={onSetRef}
             {...props}
         />
-        {error && (
+        {error ? (
             <ValidationMessage
                 className={validationClassName}
                 message={error}
+                mode="error"
+            />
+        ) : toolTip && (
+            <ValidationMessage
+                className={validationClassName}
+                message={toolTip}
+                mode="info"
             />
         )}
     </div>
 );
 
-
 FormikInput.propTypes = {
     className: PropTypes.string,
-    error: PropTypes.string,
+    // error and toolTip can be false, in which case we ignore them
+    error: PropTypes.oneOfType([PropTypes.string, PropTypes.bool]),
+    onSetRef: PropTypes.func,
+    toolTip: PropTypes.oneOfType([PropTypes.string, PropTypes.bool]),
     type: PropTypes.string,
     validationClassName: PropTypes.string,
     wrapperClassName: PropTypes.string

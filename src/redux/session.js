@@ -1,7 +1,8 @@
 const keyMirror = require('keymirror');
 const defaults = require('lodash.defaults');
+const get = require('lodash.get');
 
-const api = require('../lib/api');
+const {requestSession, requestSessionWithRetry} = require('../lib/session');
 const messageCountActions = require('./message-count.js');
 const permissionsActions = require('./permissions.js');
 
@@ -12,9 +13,10 @@ const Types = keyMirror({
 });
 
 const banWhitelistPaths = [
-    '/accounts/banned-response/',
-    '/community_guidelines/',
-    '/community_guidelines'
+    '/accounts/banned-response',
+    '/community_guidelines',
+    '/privacy_policy',
+    '/terms_of_use'
 ];
 
 module.exports.Status = keyMirror({
@@ -61,45 +63,70 @@ module.exports.setStatus = status => ({
     status: status
 });
 
+const handleSessionResponse = (dispatch, body) => {
+    if (typeof body === 'undefined') return dispatch(module.exports.setSessionError('No session content'));
+    if (
+        body.user &&
+        body.user.banned &&
+        banWhitelistPaths.indexOf(window.location.pathname) === -1
+    ) {
+        window.location = '/accounts/banned-response/';
+        return;
+    } else if (
+        body.flags &&
+        body.flags.must_complete_registration &&
+        window.location.pathname !== '/classes/complete_registration'
+    ) {
+        window.location = '/classes/complete_registration';
+        return;
+    } else if (
+        body.flags &&
+        body.flags.must_reset_password &&
+        !body.flags.must_complete_registration &&
+        window.location.pathname !== '/classes/student_password_reset/'
+    ) {
+        window.location = '/classes/student_password_reset/';
+        return;
+    }
+    dispatch(module.exports.setSession(body));
+    dispatch(module.exports.setStatus(module.exports.Status.FETCHED));
+
+    // get the permissions from the updated session
+    dispatch(permissionsActions.storePermissions(body.permissions));
+    if (typeof body.user !== 'undefined') {
+        dispatch(messageCountActions.getCount(body.user.username));
+    }
+    return;
+};
+
 module.exports.refreshSession = () => (dispatch => {
     dispatch(module.exports.setStatus(module.exports.Status.FETCHING));
-    api({
-        host: '',
-        uri: '/session/'
-    }, (err, body) => {
-        if (err) return dispatch(module.exports.setSessionError(err));
-        if (typeof body === 'undefined') return dispatch(module.exports.setSessionError('No session content'));
-        if (
-            body.user &&
-            body.user.banned &&
-            banWhitelistPaths.indexOf(window.location.pathname) === -1
-        ) {
-            window.location = '/accounts/banned-response/';
-            return;
-        } else if (
-            body.flags &&
-            body.flags.must_complete_registration &&
-            window.location.pathname !== '/classes/complete_registration'
-        ) {
-            window.location = '/classes/complete_registration';
-            return;
-        } else if (
-            body.flags &&
-            body.flags.must_reset_password &&
-            !body.flags.must_complete_registration &&
-            window.location.pathname !== '/classes/student_password_reset/'
-        ) {
-            window.location = '/classes/student_password_reset/';
-            return;
-        }
-        dispatch(module.exports.setSession(body));
-        dispatch(module.exports.setStatus(module.exports.Status.FETCHED));
-
-        // get the permissions from the updated session
-        dispatch(permissionsActions.storePermissions(body.permissions));
-        if (typeof body.user !== 'undefined') {
-            dispatch(messageCountActions.getCount(body.user.username));
-        }
-        return;
+    return new Promise((resolve, reject) => {
+        requestSession(resolve, reject);
+    }).then(body => {
+        handleSessionResponse(dispatch, body);
+    }, err => {
+        dispatch(module.exports.setSessionError(err));
     });
 });
+
+module.exports.refreshSessionWithRetry = () => (dispatch => {
+    dispatch(module.exports.setStatus(module.exports.Status.FETCHING));
+    return new Promise((resolve, reject) => {
+        requestSessionWithRetry(resolve, reject, 4, 7500);
+    }).then(body => {
+        handleSessionResponse(dispatch, body);
+    }, err => {
+        dispatch(module.exports.setSessionError(err));
+    });
+});
+
+// Selectors
+module.exports.selectIsLoggedIn = state => !!get(state, ['session', 'session', 'user'], false);
+module.exports.selectUsername = state => get(state, ['session', 'session', 'user', 'username'], null);
+module.exports.selectToken = state => get(state, ['session', 'session', 'user', 'token'], null);
+module.exports.selectIsAdmin = state => get(state, ['session', 'session', 'permissions', 'admin'], false);
+module.exports.selectIsSocial = state => get(state, ['session', 'session', 'permissions', 'social'], false);
+
+// NB logged out user id as NaN so that it can never be used in equality testing since NaN !== NaN
+module.exports.selectUserId = state => get(state, ['session', 'session', 'user', 'id'], NaN);

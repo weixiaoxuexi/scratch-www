@@ -1,4 +1,3 @@
-const FormattedHTMLMessage = require('react-intl').FormattedHTMLMessage;
 const FormattedMessage = require('react-intl').FormattedMessage;
 const injectIntl = require('react-intl').injectIntl;
 const intlShape = require('react-intl').intlShape;
@@ -276,7 +275,7 @@ const Landing = props => (
                                 id="teacherlanding.codeClub"
                                 values={{
                                     codeClubLink: (
-                                        <a href="https://codeclubprojects.org/en-GB/scratch/">
+                                        <a href="https://projects.raspberrypi.org/en/codeclub/scratch-module-1">
                                             <FormattedMessage id="teacherlanding.codeClubLink" />
                                         </a>
                                     )
@@ -338,7 +337,21 @@ const Landing = props => (
                         <FormattedMessage id="teacherlanding.accountsTitle" />
                     </h2>
                     <p>
-                        <FormattedHTMLMessage id="teacherlanding.accountsDescription" />
+                        <FormattedMessage
+                            id="teacherlanding.accountsRequestInfo"
+                            values={{
+                                setupGuideLink: (
+                                    <a href="https://resources.scratch.mit.edu/www/guides/en/scratch-teacher-accounts-guide.pdf" >
+                                        <FormattedMessage id="teacherlanding.accountsSetupGuide" />
+                                    </a>
+                                ),
+                                teacherAccountFaqLink: (
+                                    <a href="/educators/faq">
+                                        <FormattedMessage id="teacherlanding.accountsFaqPage" />
+                                    </a>
+                                )
+                            }}
+                        />
                     </p>
                     <SubNavigation
                         align="left"

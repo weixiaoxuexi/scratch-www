@@ -14,10 +14,12 @@ const Types = keyMirror({
     SET_LOGIN_OPEN: null,
     TOGGLE_LOGIN_OPEN: null,
     SET_CANCELED_DELETION_OPEN: null,
-    SET_REGISTRATION_OPEN: null
+    SET_REGISTRATION_OPEN: null,
+    HANDLE_REGISTRATION_REQUESTED: null
 });
 
 module.exports.getInitialState = () => ({
+    useScratch3Registration: true,
     accountNavOpen: false,
     canceledDeletionOpen: false,
     loginError: null,
@@ -48,6 +50,12 @@ module.exports.navigationReducer = (state, action) => {
         return defaults({canceledDeletionOpen: action.isOpen}, state);
     case Types.SET_REGISTRATION_OPEN:
         return defaults({registrationOpen: action.isOpen}, state);
+    case Types.HANDLE_REGISTRATION_REQUESTED:
+        if (state.useScratch3Registration) {
+            window.location.assign('/join');
+            return state;
+        }
+        return defaults({registrationOpen: true}, state);
     default:
         return state;
     }
@@ -91,14 +99,21 @@ module.exports.setSearchTerm = searchTerm => ({
     searchTerm: searchTerm
 });
 
-module.exports.handleCompleteRegistration = () => (dispatch => {
-    dispatch(sessionActions.refreshSession());
-    dispatch(module.exports.setRegistrationOpen(false));
+module.exports.handleRegistrationRequested = () => ({
+    type: Types.HANDLE_REGISTRATION_REQUESTED
 });
 
-module.exports.closeAccountMenus = () => (dispatch => {
-    dispatch(module.exports.setAccountNavOpen(false));
-    dispatch(module.exports.setRegistrationOpen(false));
+module.exports.handleCompleteRegistration = createProject => (dispatch => {
+    if (createProject) {
+        // TODO: Ideally this would take you to the editor with the getting started
+        // tutorial open. We need to do some extra work to wait for the user
+        // to be logged in before we try creating a project due to replication lag.
+        window.location = '/';
+    } else {
+        dispatch(sessionActions.refreshSessionWithRetry()).then(
+            dispatch(module.exports.setRegistrationOpen(false))
+        );
+    }
 });
 
 module.exports.handleLogIn = (formData, callback) => (dispatch => {

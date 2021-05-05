@@ -2,12 +2,15 @@ const FormattedMessage = require('react-intl').FormattedMessage;
 const injectIntl = require('react-intl').injectIntl;
 const intlShape = require('react-intl').intlShape;
 const MediaQuery = require('react-responsive').default;
+const connect = require('react-redux').connect;
+const PropTypes = require('prop-types');
 const React = require('react');
 
 const FooterBox = require('../container/footer.jsx');
 const LanguageChooser = require('../../languagechooser/languagechooser.jsx');
 
 const frameless = require('../../../lib/frameless');
+const getScratchWikiLink = require('../../../lib/scratch-wiki');
 
 require('./footer.scss');
 
@@ -22,7 +25,7 @@ const Footer = props => (
                         </a>
                     </dd>
                     <dd>
-                        <a href="/jobs">
+                        <a href="https://www.scratchfoundation.org/opportunities">
                             <FormattedMessage id="general.jobs" />
                         </a>
                     </dd>
@@ -83,15 +86,21 @@ const Footer = props => (
                         </a>
                     </dd>
                     <dd>
-                        <a href="/jobs">
+                        <a href="https://scratchfoundation.org/supporters">
+                            <FormattedMessage id="general.donors" />
+                        </a>
+                    </dd>
+                    <dd>
+                        <a href="https://www.scratchfoundation.org/opportunities">
                             <FormattedMessage id="general.jobs" />
                         </a>
                     </dd>
                     <dd>
-                        <a href="https://www.scratchfoundation.org/media-kit/">
-                            <FormattedMessage id="general.press" />
+                        <a href="https://secure.donationpay.org/scratchfoundation/">
+                            <FormattedMessage id="general.donate" />
                         </a>
                     </dd>
+
                 </dl>
                 <dl>
                     <dt>
@@ -108,7 +117,7 @@ const Footer = props => (
                         </a>
                     </dd>
                     <dd>
-                        <a href="https://en.scratch-wiki.info/">
+                        <a href={props.scratchWikiLink}>
                             <FormattedMessage id="general.wiki" />
                         </a>
                     </dd>
@@ -135,22 +144,12 @@ const Footer = props => (
                     </dd>
                     <dd>
                         <a href="/download">
-                            <FormattedMessage id="general.offlineEditor" />
+                            <FormattedMessage id="general.download" />
                         </a>
                     </dd>
                     <dd>
                         <a href="/contact-us/">
                             <FormattedMessage id="general.contactUs" />
-                        </a>
-                    </dd>
-                    <dd>
-                        <a href="/store">
-                            <FormattedMessage id="general.scratchStore" />
-                        </a>
-                    </dd>
-                    <dd>
-                        <a href="https://secure.donationpay.org/scratchfoundation/">
-                            <FormattedMessage id="general.donate" />
                         </a>
                     </dd>
                 </dl>
@@ -205,21 +204,27 @@ const Footer = props => (
                             <FormattedMessage id="general.scratchFoundation" />
                         </a>
                     </dd>
+                    <dd>
+                        <a href="/store">
+                            <FormattedMessage id="general.scratchStore" />
+                        </a>
+                    </dd>
+
                 </dl>
             </div>
         </MediaQuery>
         <LanguageChooser locale={props.intl.locale} />
-
-        <div className="copyright">
-            <p>
-                <FormattedMessage id="general.copyright" />
-            </p>
-        </div>
     </FooterBox>
 );
 
 Footer.propTypes = {
-    intl: intlShape.isRequired
+    intl: intlShape.isRequired,
+    scratchWikiLink: PropTypes.string
 };
 
-module.exports = injectIntl(Footer);
+const mapStateToProps = (state, ownProps) => ({
+    scratchWikiLink: getScratchWikiLink(ownProps.intl.locale)
+});
+
+const ConnectedFooter = connect(mapStateToProps)(Footer);
+module.exports = injectIntl(ConnectedFooter);

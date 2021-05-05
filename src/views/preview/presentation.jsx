@@ -111,6 +111,7 @@ const PreviewPresentation = ({
     onSocialClosed,
     onToggleComments,
     onToggleStudio,
+    onUpdateProjectData,
     onUpdateProjectId,
     onUpdateProjectThumbnail,
     originalInfo,
@@ -345,6 +346,7 @@ const PreviewPresentation = ({
                                     onProjectLoaded={onProjectLoaded}
                                     onRemixing={onRemixing}
                                     onSetProjectThumbnailer={onSetProjectThumbnailer}
+                                    onUpdateProjectData={onUpdateProjectData}
                                     onUpdateProjectId={onUpdateProjectId}
                                     onUpdateProjectThumbnail={onUpdateProjectThumbnail}
                                 />
@@ -579,7 +581,7 @@ const PreviewPresentation = ({
                                             {projectInfo.comments_allowed ? (
                                                 isLoggedIn ? (
                                                     isShared && <ComposeComment
-                                                        projectId={projectId}
+                                                        postURI={`/proxy/comments/project/${projectId}`}
                                                         onAddComment={onAddComment}
                                                     />
                                                 ) : (
@@ -599,6 +601,7 @@ const PreviewPresentation = ({
                                             <TopLevelComment
                                                 author={comment.author}
                                                 canDelete={canDeleteComments}
+                                                canDeleteWithoutConfirm={isAdmin}
                                                 canReply={isLoggedIn && projectInfo.comments_allowed && isShared}
                                                 canReport={isLoggedIn}
                                                 canRestore={canRestoreComments}
@@ -610,7 +613,7 @@ const PreviewPresentation = ({
                                                 key={comment.id}
                                                 moreRepliesToLoad={comment.moreRepliesToLoad}
                                                 parentId={comment.parent_id}
-                                                projectId={projectId}
+                                                postURI={`/proxy/comments/project/${projectId}`}
                                                 replies={replies && replies[comment.id] ? replies[comment.id] : []}
                                                 visibility={comment.visibility}
                                                 onAddComment={onAddComment}
@@ -724,6 +727,7 @@ PreviewPresentation.propTypes = {
     onSocialClosed: PropTypes.func,
     onToggleComments: PropTypes.func,
     onToggleStudio: PropTypes.func,
+    onUpdateProjectData: PropTypes.func,
     onUpdateProjectId: PropTypes.func,
     onUpdateProjectThumbnail: PropTypes.func,
     originalInfo: projectShape,

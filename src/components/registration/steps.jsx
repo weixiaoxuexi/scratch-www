@@ -12,6 +12,7 @@ const intl = require('../../lib/intl.jsx');
 
 const Avatar = require('../../components/avatar/avatar.jsx');
 const Button = require('../../components/forms/button.jsx');
+const Captcha = require('../../components/captcha/captcha.jsx');
 const Card = require('../../components/card/card.jsx');
 const CharCount = require('../../components/forms/charcount.jsx');
 const Checkbox = require('../../components/forms/checkbox.jsx');
@@ -19,7 +20,6 @@ const CheckboxGroup = require('../../components/forms/checkbox-group.jsx');
 const Form = require('../../components/forms/form.jsx');
 const GeneralError = require('../../components/forms/general-error.jsx');
 const Input = require('../../components/forms/input.jsx');
-const PhoneInput = require('../../components/forms/phone-input.jsx');
 const RadioGroup = require('../../components/forms/radio-group.jsx');
 const Select = require('../../components/forms/select.jsx');
 const Slide = require('../../components/slide/slide.jsx');
@@ -27,6 +27,7 @@ const Spinner = require('../../components/spinner/spinner.jsx');
 const StepNavigation = require('../../components/stepnavigation/stepnavigation.jsx');
 const TextArea = require('../../components/forms/textarea.jsx');
 const Tooltip = require('../../components/tooltip/tooltip.jsx');
+const ValidationMessage = require('../../components/forms/validation-message.jsx');
 
 require('./steps.scss');
 
@@ -44,7 +45,7 @@ const getCountryOptions = reactIntl => (
             disabled: true,
             value: ''
         },
-        ...countryData.registrationCountryOptions
+        ...countryData.registrationCountryCodeOptions
     ]
 );
 
@@ -83,11 +84,13 @@ class UsernameStep extends React.Component {
             'handleChangeShowPassword',
             'handleUsernameBlur',
             'handleValidSubmit',
-            'validateUsername'
+            'validateUsername',
+            'handleFocus'
         ]);
         this.state = {
             showPassword: props.showPassword,
             waiting: false,
+            showUsernameTip: true,
             validUsername: ''
         };
     }
@@ -105,17 +108,20 @@ class UsernameStep extends React.Component {
         }
 
         api({
-            host: '',
-            uri: `/accounts/check_username/${username}/`
+            uri: `/accounts/checkusername/${username}/`
         }, (err, body, res) => {
             if (err || res.statusCode !== 200) {
                 err = err || this.props.intl.formatMessage({id: 'general.error'});
                 this.form.formsy.updateInputsWithError({all: err});
                 return callback(false);
             }
-            body = body[0];
+            // get the message in a way that will work for both scratchr2 and api
+            // versions of the checkusername endpoint
+            let msg = '';
+            if (body && body.msg) msg = body.msg;
+            else if (body && body[0]) msg = body[0].msg;
 
-            switch (body.msg) {
+            switch (msg) {
             case 'valid username':
                 this.setState({
                     validUsername: 'pass'
@@ -139,7 +145,7 @@ class UsernameStep extends React.Component {
             default:
                 this.form.formsy.updateInputsWithError({
                     'user.username': this.props.intl.formatMessage({
-                        id: 'registration.validationUsernameInvalid'
+                        id: 'registration.validationUsernameNotAllowed'
                     })
                 });
                 return callback(false);
@@ -158,6 +164,9 @@ class UsernameStep extends React.Component {
             if (isValid) return this.props.onNextStep(formData);
         });
     }
+    handleFocus () {
+        this.setState({showUsernameTip: false});
+    }
     render () {
         return (
             <Slide className="registration-step username-step">
@@ -173,7 +182,7 @@ class UsernameStep extends React.Component {
                         this.props.description
                     ) : (
                         <span>
-                            <intl.FormattedMessage id="registration.usernameStepDescription" />
+                            <intl.FormattedMessage id="registration.usernameStepDescription" />&nbsp;
                             <b>
                                 <intl.FormattedMessage id="registration.usernameStepRealName" />
                             </b>
@@ -195,17 +204,22 @@ class UsernameStep extends React.Component {
                         }}
                         onValidSubmit={this.handleValidSubmit}
                     >
-                        <div>
-                            <div className="username-label">
-                                <b>
-                                    {this.props.intl.formatMessage({id: 'registration.createUsername'})}
-                                </b>
+                        <div className="form-group row">
+                            <label className="username-label col-sm-3">
+                                {this.props.intl.formatMessage({id: 'registration.createUsername'})}
                                 {this.props.usernameHelp ? (
                                     <p className="help-text">{this.props.usernameHelp}</p>
                                 ) : (
                                     null
                                 )}
-                            </div>
+                            </label>
+                            { this.state.showUsernameTip &&
+                                <ValidationMessage
+                                    className={'validation-full-width-input'}
+                                    message={this.props.intl.formatMessage({id: 'registration.usernameAdviceShort'})}
+                                    mode="info"
+                                />
+                            }
                             <Input
                                 required
                                 className={this.state.validUsername}
@@ -228,6 +242,7 @@ class UsernameStep extends React.Component {
                                     maxLength: 20
                                 }}
                                 onBlur={this.handleUsernameBlur}
+                                onFocus={this.handleFocus}
                             />
                         </div>
                         <Input
@@ -254,6 +269,7 @@ class UsernameStep extends React.Component {
                                 notEqualsField: 'user.username'
                             }}
                         />
+
                         <Checkbox
                             help={null}
                             name="showPassword"
@@ -431,7 +447,7 @@ class DemographicsStep extends React.Component {
         }));
     }
     getYearOptions () {
-        return Array.apply(null, Array(100)).map((v, id) => {
+        return Array(...Array(100)).map((v, id) => {
             const year = (new Date().getFullYear() - (id + this.props.birthOffset)).toString();
             return {value: year, label: year};
         });
@@ -439,15 +455,21 @@ class DemographicsStep extends React.Component {
     handleChooseGender (name, gender) {
         this.setState({otherDisabled: gender !== 'other'});
     }
-    // look up country name using user's country code selection
+    // look up country name using user's country code selection ('us' -> 'United States')
     getCountryName (values) {
         if (values.countryCode) {
-            const countryInfo = countryData.lookupCountryInfo(values.countryCode);
+            const countryInfo = countryData.lookupCountryByCode(values.countryCode);
             if (countryInfo) {
                 return countryInfo.name;
             }
         }
         return null;
+    }
+    // look up country code from country label ('United States' -> 'us')
+    // if `countryName` is not found, including if it's null or undefined, then this function will return undefined.
+    getCountryCode (countryName) {
+        const country = countryData.lookupCountryByName(countryName);
+        return country && country.code;
     }
     handleValidSubmit (formData) {
         const countryName = this.getCountryName(formData);
@@ -559,7 +581,7 @@ class DemographicsStep extends React.Component {
                             validations={{
                                 countryVal: values => this.countryValidator(values)
                             }}
-                            value={countryOptions[0].value}
+                            value={this.getCountryCode(this.props.countryName) || countryOptions[0].value}
                         />
                         <Checkbox
                             className="demographics-checkbox-is-robot"
@@ -584,6 +606,7 @@ class DemographicsStep extends React.Component {
 DemographicsStep.propTypes = {
     activeStep: PropTypes.number,
     birthOffset: PropTypes.number,
+    countryName: PropTypes.string, // like 'United States', not 'US' or 'United States of America'
     description: PropTypes.string,
     intl: intlShape,
     onNextStep: PropTypes.func,
@@ -677,93 +700,6 @@ NameStep.defaultProps = {
 };
 
 const IntlNameStep = injectIntl(NameStep);
-
-
-/*
- * PHONE NUMBER STEP
- */
-class PhoneNumberStep extends React.Component {
-    constructor (props) {
-        super(props);
-        bindAll(this, [
-            'handleValidSubmit'
-        ]);
-    }
-    handleValidSubmit (formData, reset, invalidate) {
-        if (!formData.phone || formData.phone.national_number === '+') {
-            return invalidate({
-                phone: this.props.intl.formatMessage({id: 'form.validationRequired'})
-            });
-        }
-        return this.props.onNextStep(formData);
-    }
-    render () {
-        return (
-            <Slide className="registration-step phone-step">
-                <h2>
-                    <intl.FormattedMessage id="teacherRegistration.phoneNumber" />
-                </h2>
-                <p className="description">
-                    <intl.FormattedMessage id="teacherRegistration.phoneStepDescription" />
-                    <Tooltip
-                        tipContent={
-                            this.props.intl.formatMessage({id: 'registration.nameStepTooltip'})
-                        }
-                        title={'?'}
-                    />
-                </p>
-                <Card>
-                    <Form onValidSubmit={this.handleValidSubmit}>
-                        <PhoneInput
-                            required
-                            defaultCountry={this.props.defaultCountry}
-                            label={
-                                this.props.intl.formatMessage({id: 'teacherRegistration.phoneNumber'})
-                            }
-                            name="phone"
-                        />
-                        <Checkbox
-                            name="phoneConsent"
-                            required="isFalse"
-                            validationErrors={{
-                                isFalse: this.props.intl.formatMessage({
-                                    id: 'teacherRegistration.validationPhoneConsent'
-                                })
-                            }}
-                            valueLabel={
-                                this.props.intl.formatMessage({id: 'teacherRegistration.phoneConsent'})
-                            }
-                        />
-                        <NextStepButton
-                            text={<intl.FormattedMessage id="registration.nextStep" />}
-                            waiting={this.props.waiting}
-                        />
-                    </Form>
-                </Card>
-                <StepNavigation
-                    active={this.props.activeStep}
-                    steps={this.props.totalSteps - 1}
-                />
-            </Slide>
-        );
-    }
-}
-
-PhoneNumberStep.propTypes = {
-    activeStep: PropTypes.number,
-    defaultCountry: PropTypes.string,
-    intl: intlShape,
-    onNextStep: PropTypes.func,
-    totalSteps: PropTypes.number,
-    waiting: PropTypes.bool
-};
-
-PhoneNumberStep.defaultProps = {
-    defaultCountry: DEFAULT_COUNTRY,
-    waiting: false
-};
-
-const IntlPhoneNumberStep = injectIntl(PhoneNumberStep);
 
 
 /*
@@ -1200,11 +1136,35 @@ class EmailStep extends React.Component {
     constructor (props) {
         super(props);
         bindAll(this, [
-            'handleValidSubmit'
+            'handleCaptchaError',
+            'handleCaptchaLoad',
+            'handleCaptchaSolved',
+            'handleValidSubmit',
+            'setCaptchaRef'
         ]);
         this.state = {
             waiting: false
         };
+    }
+    handleCaptchaLoad () {
+        this.setState({
+            waiting: true
+        });
+    }
+    handleCaptchaSolved (token) {
+        this.setState({
+            waiting: false
+        });
+        this.formData['g-recaptcha-response'] = token;
+        this.setState({'g-recaptcha-response': token});
+        this.props.onNextStep(this.formData);
+    }
+    handleCaptchaError () {
+        this.props.setRegistrationError(
+            this.props.intl.formatMessage({id: 'registration.errorCaptcha'}));
+    }
+    setCaptchaRef (ref) {
+        this.captchaRef = ref;
     }
     handleValidSubmit (formData, reset, invalidate) {
         this.setState({waiting: true});
@@ -1221,7 +1181,8 @@ class EmailStep extends React.Component {
             res = res[0];
             switch (res.msg) {
             case 'valid email':
-                return this.props.onNextStep(formData);
+                this.formData = formData;
+                return this.captchaRef.executeCaptcha();
             default:
                 return invalidate({'user.email': res.msg});
             }
@@ -1285,6 +1246,12 @@ class EmailStep extends React.Component {
                     active={this.props.activeStep}
                     steps={this.props.totalSteps - 1}
                 />
+                <Captcha
+                    ref={this.setCaptchaRef}
+                    onCaptchaError={this.handleCaptchaError}
+                    onCaptchaLoad={this.handleCaptchaLoad}
+                    onCaptchaSolved={this.handleCaptchaSolved}
+                />
             </Slide>
         );
     }
@@ -1294,6 +1261,7 @@ EmailStep.propTypes = {
     activeStep: PropTypes.number,
     intl: intlShape,
     onNextStep: PropTypes.func,
+    setRegistrationError: PropTypes.func,
     totalSteps: PropTypes.number,
     waiting: PropTypes.bool
 };
@@ -1610,11 +1578,12 @@ RegistrationError.propTypes = {
 
 const IntlRegistrationError = injectIntl(RegistrationError);
 
+module.exports.DEFAULT_COUNTRY = DEFAULT_COUNTRY;
+module.exports.NextStepButton = NextStepButton;
 module.exports.UsernameStep = IntlUsernameStep;
 module.exports.ChoosePasswordStep = IntlChoosePasswordStep;
 module.exports.DemographicsStep = IntlDemographicsStep;
 module.exports.NameStep = IntlNameStep;
-module.exports.PhoneNumberStep = IntlPhoneNumberStep;
 module.exports.OrganizationStep = IntlOrganizationStep;
 module.exports.AddressStep = IntlAddressStep;
 module.exports.UseScratchStep = IntlUseScratchStep;

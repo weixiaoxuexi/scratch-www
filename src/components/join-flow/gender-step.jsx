@@ -4,17 +4,21 @@ const React = require('react');
 const PropTypes = require('prop-types');
 import {Formik} from 'formik';
 const {injectIntl, intlShape} = require('react-intl');
+const FormattedMessage = require('react-intl').FormattedMessage;
 
 const FormikRadioButton = require('../../components/formik-forms/formik-radio-button.jsx');
 const JoinFlowStep = require('./join-flow-step.jsx');
+const InfoButton = require('../info-button/info-button.jsx');
 
 require('./join-flow-steps.scss');
 
 const GenderOption = ({
+    id,
     label,
     onSetFieldValue,
     selectedValue,
-    value
+    value,
+    ...props
 }) => (
     <div
         className={classNames(
@@ -29,17 +33,20 @@ const GenderOption = ({
         /* eslint-enable react/jsx-no-bind */
     >
         <FormikRadioButton
-            buttonValue={value}
             className={classNames(
                 'join-flow-radio'
             )}
+            id={id}
             label={label}
             name="gender"
+            value={value}
+            {...props}
         />
     </div>
 );
 
 GenderOption.propTypes = {
+    id: PropTypes.string,
     label: PropTypes.string,
     onSetFieldValue: PropTypes.func,
     selectedValue: PropTypes.string,
@@ -50,13 +57,28 @@ class GenderStep extends React.Component {
     constructor (props) {
         super(props);
         bindAll(this, [
+            'handleSetCustomRef',
             'handleValidSubmit'
         ]);
     }
+    componentDidMount () {
+        if (this.props.sendAnalytics) {
+            this.props.sendAnalytics('join-gender');
+        }
+    }
+    handleSetCustomRef (customInputRef) {
+        this.customInput = customInputRef;
+    }
     handleValidSubmit (formData, formikBag) {
         formikBag.setSubmitting(false);
-        if (!formData.gender || formData.gender === 'null') {
-            formData.gender = 'Prefer not to say';
+        // handle defaults:
+        // when gender is specifically made blank, use "(blank)"
+        if (!formData.gender || formData.gender === '') {
+            formData.gender = '(blank)';
+        }
+        // when user clicks Next without making any selection, use "(skipped)"
+        if (formData.gender === 'null') {
+            formData.gender = '(skipped)';
         }
         delete formData.custom;
         this.props.onNextStep(formData);
@@ -80,22 +102,31 @@ class GenderStep extends React.Component {
                     } = props;
                     return (
                         <JoinFlowStep
-                            className="join-flow-gender-step"
                             description={this.props.intl.formatMessage({id: 'registration.genderStepDescription'})}
+                            descriptionClassName="join-flow-gender-description"
+                            innerClassName="join-flow-inner-gender-step"
                             title={this.props.intl.formatMessage({id: 'registration.genderStepTitle'})}
                             waiting={isSubmitting}
                             onSubmit={handleSubmit}
                         >
                             <GenderOption
+                                id="GenderRadioOptionFemale"
                                 label={this.props.intl.formatMessage({id: 'general.female'})}
                                 selectedValue={values.gender}
-                                value="Female"
+                                value="female"
                                 onSetFieldValue={setFieldValue}
                             />
                             <GenderOption
+                                id="GenderRadioOptionMale"
                                 label={this.props.intl.formatMessage({id: 'general.male'})}
                                 selectedValue={values.gender}
-                                value="Male"
+                                value="male"
+                                onSetFieldValue={setFieldValue}
+                            />
+                            <GenderOption
+                                label={this.props.intl.formatMessage({id: 'general.nonBinary'})}
+                                selectedValue={values.gender}
+                                value="non-binary"
                                 onSetFieldValue={setFieldValue}
                             />
                             <div
@@ -107,31 +138,43 @@ class GenderStep extends React.Component {
                                     {'gender-radio-row-selected': (values.gender === values.custom)}
                                 )}
                                 /* eslint-disable react/jsx-no-bind */
-                                onClick={() => setFieldValue('gender', values.custom, false)}
+                                onClick={() => {
+                                    setFieldValue('gender', values.custom, false);
+                                    if (this.customInput) this.customInput.focus();
+                                }}
                                 /* eslint-enable react/jsx-no-bind */
                             >
                                 <FormikRadioButton
                                     isCustomInput
-                                    buttonValue={values.custom}
                                     className={classNames(
                                         'join-flow-radio'
                                     )}
+                                    id="GenderRadioOptionCustom"
                                     label={this.props.intl.formatMessage({id: 'registration.genderOptionAnother'})}
                                     name="gender"
+                                    value={values.custom}
                                     /* eslint-disable react/jsx-no-bind */
                                     onSetCustom={newCustomVal => setValues({
-                                        gender: newCustomVal,
-                                        custom: newCustomVal
+                                        gender: newCustomVal.substring(0, 25),
+                                        custom: newCustomVal.substring(0, 25)
                                     })}
+                                    onSetCustomRef={this.handleSetCustomRef}
                                     /* eslint-enable react/jsx-no-bind */
                                 />
                             </div>
                             <GenderOption
+                                id="GenderRadioOptionPreferNot"
                                 label={this.props.intl.formatMessage({id: 'registration.genderOptionPreferNotToSay'})}
                                 selectedValue={values.gender}
-                                value="Prefer not to say"
+                                value="(Prefer not to say)"
                                 onSetFieldValue={setFieldValue}
                             />
+                            <div className="join-flow-privacy-message join-flow-gender-privacy">
+                                <FormattedMessage id="registration.private" />
+                                <InfoButton
+                                    message={this.props.intl.formatMessage({id: 'registration.genderStepInfo'})}
+                                />
+                            </div>
                         </JoinFlowStep>
                     );
                 }}
@@ -142,7 +185,8 @@ class GenderStep extends React.Component {
 
 GenderStep.propTypes = {
     intl: intlShape,
-    onNextStep: PropTypes.func
+    onNextStep: PropTypes.func,
+    sendAnalytics: PropTypes.func.isRequired
 };
 
 module.exports = injectIntl(GenderStep);

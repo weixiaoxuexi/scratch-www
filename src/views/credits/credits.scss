@@ -6,44 +6,16 @@
 }
 
 .credits {
-    .avatar-grid {
-        display: flex;
-        margin: 0 auto;
-        padding: 64px 0;
-        max-width: 864px;
-        list-style: none;
-        flex-wrap: wrap;
-        flex-flow: row wrap;
-        justify-content: center;
-    }
-
     .content {
         padding-top: 40px;
     }
+    
+    #acknowledgements {
+        background-color: rgba(77, 151, 255, 0.15);
+    }
 
-    .avatar-item {
-        display: inline-block;
-        margin: 0;
-        padding-bottom: 32px;
-        text-align: center;
-        line-height: 1.25rem;
-
-        img {
-            $img-border: rgba(0, 0, 0, .05);
-            border: 2px solid $img-border;
-            border-radius: 8px;
-            background-color: $ui-white;
-            width: 80px;
-            height: 80px;
-        }
-
-        .avatar-text {
-            display: inline-block;
-            width: 144px;
-            font-size: .875rem;
-            word-wrap: break-word;
-
-        }
+    .avatar-grid {
+        padding: 64px 0;
     }
 
     .acknowledge-content {
@@ -93,9 +65,7 @@
     }
 
     .supporters {
-        $bg-grey: #f7f6f8;
-        background-color: $bg-grey;
-        padding: 5.25rem 0;
+        padding: 0 0 5.25rem;
     }
 
     .logo {
@@ -113,6 +83,11 @@
         font-size: 2rem;
     }
 
+    #donors {
+        max-width: 980px;
+        margin-left: auto;
+        margin-right: auto;
+    }
 }
 
 @media only screen and (min-width: 477px) and (max-width: 768px) {

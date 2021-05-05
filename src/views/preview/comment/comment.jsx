@@ -54,7 +54,11 @@ class Comment extends React.Component {
     }
 
     handleDelete () {
-        this.setState({deleting: true});
+        if (this.props.canDeleteWithoutConfirm) {
+            this.props.onDelete(this.props.id);
+        } else {
+            this.setState({deleting: true});
+        }
     }
 
     handleConfirmDelete () {
@@ -106,7 +110,7 @@ class Comment extends React.Component {
             highlighted,
             id,
             parentId,
-            projectId,
+            postURI,
             replyUsername,
             visibility
         } = this.props;
@@ -227,9 +231,10 @@ class Comment extends React.Component {
                     {this.state.replying ? (
                         <FlexRow className="comment-reply-row">
                             <ComposeComment
+                                isReply
                                 commenteeId={author.id}
                                 parentId={parentId || id}
-                                projectId={projectId}
+                                postURI={postURI}
                                 onAddComment={this.handlePostReply}
                                 onCancel={this.handleToggleReplying}
                             />
@@ -267,6 +272,7 @@ Comment.propTypes = {
         username: PropTypes.string
     }),
     canDelete: PropTypes.bool,
+    canDeleteWithoutConfirm: PropTypes.bool,
     canReply: PropTypes.bool,
     canReport: PropTypes.bool,
     canRestore: PropTypes.bool,
@@ -279,7 +285,7 @@ Comment.propTypes = {
     onReport: PropTypes.func,
     onRestore: PropTypes.func,
     parentId: PropTypes.number,
-    projectId: PropTypes.string,
+    postURI: PropTypes.string,
     replyUsername: PropTypes.string,
     visibility: PropTypes.string
 };

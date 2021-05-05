@@ -7,6 +7,7 @@ const {injectIntl, intlShape} = require('react-intl');
 
 const validate = require('../../lib/validate');
 const FormikInput = require('../../components/formik-forms/formik-input.jsx');
+const FormikCheckbox = require('../../components/formik-forms/formik-checkbox.jsx');
 const JoinFlowStep = require('./join-flow-step.jsx');
 
 require('./join-flow-steps.scss');
@@ -19,37 +20,81 @@ class UsernameStep extends React.Component {
     constructor (props) {
         super(props);
         bindAll(this, [
-            'handleChangeShowPassword',
+            'handleFocused',
+            'handleSetUsernameRef',
             'handleValidSubmit',
             'validatePasswordIfPresent',
             'validatePasswordConfirmIfPresent',
             'validateUsernameIfPresent',
+            'validateUsernameRemotelyWithCache',
             'validateForm'
         ]);
         this.state = {
-            showPassword: false
+            focused: null
         };
+        // simple object to memoize remote requests for usernames.
+        // keeps us from submitting multiple requests for same data.
+        this.usernameRemoteCache = Object.create(null);
     }
-    handleChangeShowPassword () {
-        this.setState({showPassword: !this.state.showPassword});
+    componentDidMount () {
+        // Send info to analytics when we aren't on the standalone page.
+        // If we are on the standalone join page, the page load will take care of this.
+        if (window.location.pathname.indexOf('/join') === -1) {
+            if (this.props.sendAnalytics) {
+                this.props.sendAnalytics('join-username-modal');
+            }
+        }
+
+        // automatically start with focus on username field
+        if (this.usernameInput) this.usernameInput.focus();
+    }
+    // track the currently focused input field, to determine whether each field should
+    // display a tooltip. (We only display it if a field is focused and has never been touched.)
+    handleFocused (fieldName) {
+        this.setState({focused: fieldName});
+    }
+    handleSetUsernameRef (usernameInputRef) {
+        this.usernameInput = usernameInputRef;
+    }
+    // simple function to memoize remote requests for usernames
+    validateUsernameRemotelyWithCache (username) {
+        if (typeof this.usernameRemoteCache[username] === 'object') {
+            return Promise.resolve(this.usernameRemoteCache[username]);
+        }
+        // username is not in our cache
+        return validate.validateUsernameRemotely(username).then(
+            remoteResult => {
+                // cache result, if it successfully heard back from server
+                if (remoteResult.requestSucceeded) {
+                    this.usernameRemoteCache[username] = remoteResult;
+                }
+                return remoteResult;
+            }
+        );
     }
     // we allow username to be empty on blur, since you might not have typed anything yet
     validateUsernameIfPresent (username) {
         if (!username) return null; // skip validation if username is blank; null indicates valid
+        // if username is not blank, run both local and remote validations
         const localResult = validate.validateUsernameLocally(username);
-        if (localResult.valid) {
-            return validate.validateUsernameRemotely(username).then(
-                remoteResult => {
-                    if (remoteResult.valid) return null;
+        return this.validateUsernameRemotelyWithCache(username).then(
+            remoteResult => {
+                // there may be multiple validation errors. Prioritize vulgarity, then
+                // length, then having invalid chars, then all other remote reports
+                if (remoteResult.valid === false && remoteResult.errMsgId === 'registration.validationUsernameVulgar') {
+                    return this.props.intl.formatMessage({id: remoteResult.errMsgId});
+                } else if (localResult.valid === false) {
+                    return this.props.intl.formatMessage({id: localResult.errMsgId});
+                } else if (remoteResult.valid === false) {
                     return this.props.intl.formatMessage({id: remoteResult.errMsgId});
                 }
-            );
-        }
-        return this.props.intl.formatMessage({id: localResult.errMsgId});
+                return null;
+            }
+        );
     }
-    validatePasswordIfPresent (password) {
+    validatePasswordIfPresent (password, username) {
         if (!password) return null; // skip validation if password is blank; null indicates valid
-        const localResult = validate.validatePassword(password);
+        const localResult = validate.validatePassword(password, username);
         if (localResult.valid) return null;
         return this.props.intl.formatMessage({id: localResult.errMsgId});
     }
@@ -69,12 +114,9 @@ class UsernameStep extends React.Component {
         if (!usernameResult.valid) {
             errors.username = this.props.intl.formatMessage({id: usernameResult.errMsgId});
         }
-        const passwordResult = validate.validatePassword(values.password);
+        const passwordResult = validate.validatePassword(values.password, values.username);
         if (!passwordResult.valid) {
             errors.password = this.props.intl.formatMessage({id: passwordResult.errMsgId});
-        }
-        if (values.password === values.username) {
-            errors.password = this.props.intl.formatMessage({id: 'registration.validationPasswordNotUsername'});
         }
         const passwordConfirmResult = validate.validatePasswordConfirm(values.password, values.passwordConfirm);
         if (!passwordConfirmResult.valid) {
@@ -85,6 +127,7 @@ class UsernameStep extends React.Component {
     // called after all validations pass with no errors
     handleValidSubmit (formData, formikBag) {
         formikBag.setSubmitting(false); // formik makes us do this ourselves
+        delete formData.showPassword;
         this.props.onNextStep(formData);
     }
     render () {
@@ -93,7 +136,8 @@ class UsernameStep extends React.Component {
                 initialValues={{
                     username: '',
                     password: '',
-                    passwordConfirm: ''
+                    passwordConfirm: '',
+                    showPassword: true
                 }}
                 validate={this.validateForm}
                 validateOnBlur={false}
@@ -105,6 +149,10 @@ class UsernameStep extends React.Component {
                         errors,
                         handleSubmit,
                         isSubmitting,
+                        setFieldError,
+                        setFieldTouched,
+                        setFieldValue,
+                        touched,
                         validateField,
                         values
                     } = props;
@@ -113,6 +161,7 @@ class UsernameStep extends React.Component {
                             description={this.props.intl.formatMessage({
                                 id: 'registration.usernameStepDescriptionNonEducator'
                             })}
+                            innerClassName="join-flow-inner-username-step"
                             title={this.props.intl.formatMessage({id: 'general.joinScratch'})}
                             waiting={isSubmitting}
                             onSubmit={handleSubmit}
@@ -122,66 +171,113 @@ class UsernameStep extends React.Component {
                                     {this.props.intl.formatMessage({id: 'registration.createUsername'})}
                                 </div>
                                 <FormikInput
+                                    autoCapitalize="off"
+                                    autoComplete="off"
+                                    autoCorrect="off"
                                     className={classNames(
-                                        'join-flow-input',
-                                        {fail: errors.username}
+                                        'join-flow-input'
                                     )}
                                     error={errors.username}
                                     id="username"
                                     name="username"
+                                    placeholder={this.props.intl.formatMessage({id: 'general.username'})}
+                                    spellCheck={false}
+                                    toolTip={this.state.focused === 'username' && !touched.username &&
+                                        this.props.intl.formatMessage({id: 'registration.usernameAdviceShort'})}
                                     validate={this.validateUsernameIfPresent}
                                     validationClassName="validation-full-width-input"
-                                    onBlur={() => validateField('username')} // eslint-disable-line react/jsx-no-bind
+                                    /* eslint-disable react/jsx-no-bind */
+                                    onBlur={() => validateField('username')}
+                                    onChange={e => {
+                                        setFieldValue('username', e.target.value.substring(0, 30));
+                                        setFieldTouched('username');
+                                        setFieldError('username', null);
+                                    }}
+                                    onFocus={() => this.handleFocused('username')}
+                                    /* eslint-enable react/jsx-no-bind */
+                                    onSetRef={this.handleSetUsernameRef}
                                 />
                                 <div className="join-flow-password-section">
                                     <div className="join-flow-input-title">
                                         {this.props.intl.formatMessage({id: 'registration.choosePasswordStepTitle'})}
                                     </div>
                                     <FormikInput
+                                        autoCapitalize="off"
+                                        autoComplete={values.showPassword ? 'off' : 'new-password'}
+                                        autoCorrect="off"
                                         className={classNames(
                                             'join-flow-input',
-                                            {fail: errors.password}
+                                            {'join-flow-input-password':
+                                                !values.showPassword && values.password.length > 0}
                                         )}
                                         error={errors.password}
                                         id="password"
                                         name="password"
-                                        type={this.state.showPassword ? 'text' : 'password'}
-                                        validate={this.validatePasswordIfPresent}
-                                        validationClassName="validation-full-width-input"
+                                        placeholder={this.props.intl.formatMessage({id: 'general.password'})}
+                                        spellCheck={false}
+                                        toolTip={this.state.focused === 'password' && !touched.password &&
+                                            this.props.intl.formatMessage({id: 'registration.passwordAdviceShort'})}
+                                        type={values.showPassword ? 'text' : 'password'}
                                         /* eslint-disable react/jsx-no-bind */
+                                        validate={password => this.validatePasswordIfPresent(password, values.username)}
+                                        validationClassName="validation-full-width-input"
                                         onBlur={() => validateField('password')}
+                                        onChange={e => {
+                                            setFieldValue('password', e.target.value);
+                                            setFieldTouched('password');
+                                            setFieldError('password', null);
+                                        }}
+                                        onFocus={() => this.handleFocused('password')}
                                         /* eslint-enable react/jsx-no-bind */
                                     />
                                     <FormikInput
+                                        autoCapitalize="off"
+                                        autoComplete={values.showPassword ? 'off' : 'new-password'}
+                                        autoCorrect="off"
                                         className={classNames(
                                             'join-flow-input',
-                                            {fail: errors.passwordConfirm}
+                                            'join-flow-password-confirm',
+                                            {
+                                                'join-flow-input-password':
+                                                    !values.showPassword && values.passwordConfirm.length > 0,
+                                                'fail': errors.passwordConfirm
+                                            }
                                         )}
                                         error={errors.passwordConfirm}
                                         id="passwordConfirm"
                                         name="passwordConfirm"
-                                        type={this.state.showPassword ? 'text' : 'password'}
+                                        placeholder={this.props.intl.formatMessage({
+                                            id: 'registration.confirmPasswordInstruction'
+                                        })}
+                                        spellCheck={false}
+                                        toolTip={
+                                            this.state.focused === 'passwordConfirm' && !touched.passwordConfirm &&
+                                                this.props.intl.formatMessage({
+                                                    id: 'registration.confirmPasswordInstruction'
+                                                })
+                                        }
+                                        type={values.showPassword ? 'text' : 'password'}
                                         /* eslint-disable react/jsx-no-bind */
                                         validate={() =>
                                             this.validatePasswordConfirmIfPresent(values.password,
                                                 values.passwordConfirm)
                                         }
                                         validationClassName="validation-full-width-input"
-                                        onBlur={() =>
-                                            validateField('passwordConfirm')
-                                        }
+                                        onBlur={() => validateField('passwordConfirm')}
+                                        onChange={e => {
+                                            setFieldValue('passwordConfirm', e.target.value);
+                                            setFieldTouched('passwordConfirm');
+                                            setFieldError('passwordConfirm', null);
+                                        }}
+                                        onFocus={() => this.handleFocused('passwordConfirm')}
                                         /* eslint-enable react/jsx-no-bind */
                                     />
-                                    <div className="join-flow-input-title">
-                                        <div
-                                            onClick={this.handleChangeShowPassword}
-                                        >
-                                            {/* TODO: should localize 'Hide password' if we use that */}
-                                            {this.state.showPassword ? 'Hide password' : (
-                                                this.props.intl.formatMessage({id: 'registration.showPassword'})
-                                            )}
-                                        </div>
-                                    </div>
+                                    <FormikCheckbox
+                                        id="showPassword"
+                                        label={this.props.intl.formatMessage({id: 'registration.showPassword'})}
+                                        labelClassName="join-flow-input-title"
+                                        name="showPassword"
+                                    />
                                 </div>
                             </div>
                         </JoinFlowStep>
@@ -194,7 +290,8 @@ class UsernameStep extends React.Component {
 
 UsernameStep.propTypes = {
     intl: intlShape,
-    onNextStep: PropTypes.func
+    onNextStep: PropTypes.func,
+    sendAnalytics: PropTypes.func.isRequired
 };
 
 const IntlUsernameStep = injectIntl(UsernameStep);

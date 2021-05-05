@@ -92,7 +92,7 @@ class Ideas extends React.Component {
                             className="tips-info-section tips-left"
                         >
                             <div className="ideas-image">
-                                <img src="images/ideas/getting-started-illustration.svg" />
+                                <img src="/images/ideas/getting-started-illustration.svg" />
                             </div>
                             <div>
                                 <h2>
@@ -163,7 +163,7 @@ class Ideas extends React.Component {
                                 >
                                     <Button className="ideas-button">
                                         <img src="/images/ideas/download-icon.svg" />
-                                        <FormattedMessage id="ideas.downloadPDF" />
+                                        <FormattedMessage id="general.downloadPDF" />
                                     </Button>
                                 </a>
                             </div>
